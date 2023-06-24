@@ -220,6 +220,21 @@ char* get_http_cookie(struct http_req h, char* cookie)
 	return NULL;
 }
 
+int serve_http_redirect(int fd, uint64_t clientid, char *to)
+{
+	char msg[2048];
+	int msg_size = snprintf(msg, sizeof(msg),
+		"HTTP/1.1 301 Moved Permanently\r\n"
+		"Connection: keep-alive\r\n"
+		"Set-Cookie: id=%" PRIu64 "; SameSite=Lax\r\n"
+		"Location: %s\r\n"
+		"Content-Length: 0\r\n"
+		"\r\n",
+		clientid, to);
+	send(fd, msg, msg_size, 0);
+	return 0;
+}
+
 int serve_http_file_with_status(int fd, uint64_t clientid, FILE* f, const char* status)
 {
 	char msg[1024];
@@ -560,6 +575,8 @@ int main(int argc, char** argv)
 		fprintf(stderr, "Specify a path to serve: %s <path>\n", argv[0]);
 		return 1;
 	}
+	char *the_directory = argv[1];
+	size_t the_directory_len = strlen(the_directory);
 	srand(time(0));
 	if(signal(SIGINT, sig_handler) == SIG_ERR)
 	{
@@ -699,22 +716,17 @@ int main(int argc, char** argv)
 							break;
 						}
 					printf("client id is %" PRIu64 "\n", clientid[i]);
-					/*if(strcmp(r.url, "/") == 0)
-					{
-						printf("serve index.html\n");
-						serve_http_file(client[i], clientid[i], "html/index.html");
-					} 
-					else if(strncmp(r.url, "/rootfs", 7) == 0 && r.url[7] == '/')
-						serve_http_directory(client[i], clientid[i], r.url + 7, "/rootfs");
-					else if(strcmp(r.url, "/snake_is_not_allowed__dont_modify_this_url__there_arent_easter_eggs_here") == 0)
-						serve_http_file(client[i], clientid[i], "html/not_snek.html");
-					else if(strncmp(r.url, "/snake", 6) == 0 && strstr(r.url, "not") == NULL)
-						serve_http_file(client[i], clientid[i], "html/snek.html");
+					if(strcmp(r.url, "/") == 0)
+						serve_http_file(client[i], clientid[i], the_directory);
+					else if(strncmp(r.url, the_directory, the_directory_len) == 0 && strstr(r.url, "./") == NULL)
+						serve_http_directory(client[i], clientid[i], r.url, "");
+					else if(strncmp(r.url, "/html/icon/", 11) == 0 && strstr(r.url, "./") == NULL)
+						serve_http_file(client[i], clientid[i], r.url + 1);
 					else
 					{
 						printf("unknown file\n");
-						serve_http_file(client[i], clientid[i], "html/404.html");
-					}*/
+						serve_http_file(client[i], clientid[i], "");
+					}
 					destroy_http_req(r);
 				}
 			}
